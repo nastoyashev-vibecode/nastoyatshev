@@ -1158,11 +1158,13 @@ function tileImgs(){
 }
 })();
 
-/* ================= БЛОК 9: ЭКРАН ПО РЕФЕРЕНСУ (герой-персонаж, comic-панели, нав 4+6) ================= */
+/* ================= БЛОК 10: НАДЁЖНОЕ ЗАПОЛНЕНИЕ НОВОГО ЭКРАНА (интервал-страховка при загрузке) ================= */
 (function(){
 if(typeof document==="undefined")return;
-var bound=false;
+var bound=false,_qkey='';
 function $(id){return document.getElementById(id);}
+function setTxt(id,v){var e=$(id);if(e&&e.textContent!==String(v))e.textContent=v;}
+function setB(id,v){var e=$(id);if(!e)return;var b=e.querySelector('b');if(b){if(b.textContent!==String(v))b.textContent=v;}else if(e.textContent!==String(v))e.textContent=v;}
 function fmtMoney(n){n=Math.round(n||0);var a=Math.abs(n),s=n<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(a>=1e7?0:1).replace('.0','')+'M';if(a>=1000)return s+(a/1000).toFixed(a>=1e4?0:1).replace('.0','')+'K';return s+a;}
 function avSt(){return (S.health<28||S.energy<18)?'tired':(S.mood>=75?'happy':(S.mood<30?'sad':'ok'));}
 function hTier(){return S.housing>=13?'elite':S.housing>=9?'own':S.housing>=3?'rent':'parents';}
@@ -1170,54 +1172,28 @@ function img(rel){return (typeof IMGSRC==='function')?IMGSRC(rel):('assets/'+rel
 function setImg(el,src){if(!el)return;if(el.getAttribute('src')!==src){el.setAttribute('src',src);el.onerror=function(){this.style.visibility='hidden';};el.style.visibility='visible';}}
 function lifeLeft(){return Math.max(1,Math.round(83+(S.health-70)/6-(S.age-17)));}
 function dateShort(){try{var p=dateParts();return p.d+' '+MONTHS[p.m].slice(0,3)+'. '+p.y;}catch(e){return '';}}
-function incomeMonthly(){var inc=0;if(S.job)inc+=Math.round(jobPay(jobById(S.job))*20);if(S.rentalUnits)inc+=S.rentalUnits*priceRaw(12000);if(S.passive)inc+=S.passive;if(S.married)inc+=priceRaw(35000);return inc;}
-function expenseMonthly(){var e=0;var h=HOUSING[S.housing];var rent=h.rent;if(S.married&&rent)rent=Math.round(rent*0.6);if(rent)e+=price(rent);if(h.owned||h.mortgage)e+=price(3500);if(!h.parentsFeed)e+=price(300)*30;if(TRANSPORT[S.transport].daily)e+=price(TRANSPORT[S.transport].daily)*30;e+=subsCost();if(S.kids)e+=S.kids*price(15000);return e;}
-
-var _r9=render;
-render=function(){ _r9(); try{ ref9(); }catch(e){} };
-
-function ref9(){
-  if(!S)return;
-  if(!bound)bindOnce();
-  $('rHealth').textContent=Math.round(S.health)+'%';
-  $('rMood').textContent=Math.round(S.mood)+'%';
-  $('rMoney').textContent=fmtMoney(S.money);
-  $('rName').textContent=S.name||'Игрок';
-  $('rAge').textContent=S.age+' лет';
-  $('rLife').textContent='Жить осталось '+lifeLeft()+' лет';
-  var inc=incomeMonthly(),exp=expenseMonthly();
-  $('rInc').textContent='Доход: '+(inc>0?fmtMoney(inc):'--');
-  $('rExp').textContent='Расход: '+(exp>0?('−'+fmtMoney(exp)):'0');
-  $('rDate').textContent=dateShort();
-  $('rEnergy').textContent='⚡'+Math.round(S.energy);
-  $('rSat').textContent='🍔'+Math.round(S.sat);
-  $('rFat').textContent='🔥'+Math.round(S.fatigue||0);
-  setImg($('sceneBg'),img('bg/'+hTier()+'.png'));
-  setImg($('hero'),img('avatar/'+avSt()+'.png'));
-  // цель дня
-  var gc=$('goalChip'); if(gc){try{gc.textContent=(S.sandbox?('🎯 '+nextGoal()):('🎯 '+QUESTS[S.quest].text))+' · '+seasonName().split(' ')[1]+', день '+(S.day+1);}catch(e){}}
-  renderQuick();
-  fixBadges();
-}
-function renderQuick(){
-  var q=$('quick'); if(!q)return;
-  var acts=[
-    {t:'Поесть',i:'🍔',run:function(){openTileByName('Быт');}},
-    {t:'Пойти учиться',i:'🎓',run:function(){openTileByName('Учёба');}},
-    S.job?{t:'Выйти на смену',i:'💼',run:function(){runId('shift');}}:{t:'Найти работу',i:'💼',run:function(){openTileByName('Работа');}}
-  ];
+function incMon(){var i=0;if(S.job)i+=Math.round(jobPay(jobById(S.job))*20);if(S.rentalUnits)i+=S.rentalUnits*priceRaw(12000);if(S.passive)i+=S.passive;if(S.married)i+=priceRaw(35000);return i;}
+function expMon(){var e=0,h=HOUSING[S.housing],rent=h.rent;if(S.married&&rent)rent=Math.round(rent*0.6);if(rent)e+=price(rent);if(h.owned||h.mortgage)e+=price(3500);if(!h.parentsFeed)e+=price(300)*30;if(TRANSPORT[S.transport].daily)e+=price(TRANSPORT[S.transport].daily)*30;e+=subsCost();if(S.kids)e+=S.kids*price(15000);return e;}
+function bindOnce(){bound=true;var pm={plusH:'Здоровье',plusM:'Досуг',plusMoney:'Работа'};Object.keys(pm).forEach(function(id){var b=$(id);if(b)b.onclick=function(){openTileByName(pm[id]);};});var m=$('btnMenu');if(m)m.onclick=function(){openHero();};}
+function renderQuick(){var q=$('quick');if(!q)return;var key=S.job?'work':'no';if(key===_qkey&&q.children.length)return;_qkey=key;
+  var acts=[{t:'Поесть',i:'🍔',f:function(){openTileByName('Быт');}},{t:'Пойти учиться',i:'🎓',f:function(){openTileByName('Учёба');}},S.job?{t:'Выйти на смену',i:'💼',f:function(){runId('shift');}}:{t:'Найти работу',i:'💼',f:function(){openTileByName('Работа');}}];
   q.innerHTML=acts.map(function(a,i){return '<button class="qbtn" data-qi="'+i+'"><span class="qi">'+a.i+'</span>'+a.t+'</button>';}).join('');
-  q.querySelectorAll('.qbtn').forEach(function(b){b.onclick=function(){acts[+b.dataset.qi].run();};});
+  q.querySelectorAll('.qbtn').forEach(function(b){b.onclick=function(){acts[+b.dataset.qi].f();};});}
+function fixBadges(){document.querySelectorAll('#tiles .tbadge').forEach(function(b){b.remove();});if(!S.job){var t=document.querySelectorAll('#tiles .tile');if(t[0]){var s=document.createElement('span');s.className='tbadge';t[0].appendChild(s);}}}
+function paint(){
+  if(typeof S==='undefined'||!S)return;
+  if(!bound)bindOnce();
+  setTxt('rHealth',Math.round(S.health)+'%');setTxt('rMood',Math.round(S.mood)+'%');setTxt('rMoney',fmtMoney(S.money));
+  setTxt('rName',S.name||'Игрок');setTxt('rAge',S.age+' лет');setTxt('rLife','Жить осталось '+lifeLeft()+' лет');
+  var inc=incMon(),exp=expMon();
+  setTxt('rInc','Доход: '+(inc>0?fmtMoney(inc):'--'));setTxt('rExp','Расход: '+(exp>0?('−'+fmtMoney(exp)):'0'));
+  setTxt('rDate',dateShort());setB('rEnergy',Math.round(S.energy));setB('rSat',Math.round(S.sat));setB('rFat',Math.round(S.fatigue||0));
+  setImg($('sceneBg'),img('bg/'+hTier()+'.png'));setImg($('hero'),img('avatar/'+avSt()+'.png'));
+  var gc=$('goalChip');if(gc){try{gc.textContent=(S.sandbox?('🎯 '+nextGoal()):('🎯 '+QUESTS[S.quest].text))+' · день '+(S.day+1);}catch(e){}}
+  renderQuick();fixBadges();
 }
-function fixBadges(){
-  document.querySelectorAll('#tiles .tbadge').forEach(function(b){b.remove();});
-  // «!» только на Работе, когда нет работы
-  if(!S.job){var tiles=document.querySelectorAll('#tiles .tile'); if(tiles[0]){var s=document.createElement('span');s.className='tbadge';tiles[0].appendChild(s);}}
-}
-function bindOnce(){
-  bound=true;
-  var pmap={plusH:'Здоровье',plusM:'Досуг',plusMoney:'Работа'};
-  Object.keys(pmap).forEach(function(id){var b=$(id);if(b)b.onclick=function(){openTileByName(pmap[id]);};});
-  var m=$('btnMenu'); if(m)m.onclick=function(){openHero();};
-}
+var _r=render;render=function(){ _r(); try{paint();}catch(e){} };
+function tick(){try{var g=$('game');if(typeof S!=='undefined'&&S&&g&&!g.classList.contains('hidden'))paint();}catch(e){}}
+setInterval(tick,500);setTimeout(tick,120);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(tick,150);});
 })();

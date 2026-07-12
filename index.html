@@ -29,12 +29,12 @@
   /* ===== ИГРА ===== */
   #game{height:100dvh;display:flex;flex-direction:column;background:#0e2b52}
   /* ВЕРХ */
-  #topHud{flex:0 0 auto;background:linear-gradient(180deg,#2f7fe6,#1f63c8);padding:7px 8px 9px;box-shadow:0 3px 8px rgba(0,0,0,.25)}
+  #topHud{flex:0 0 auto;background:linear-gradient(180deg,#3b93ff,#2069d6);background-image:radial-gradient(rgba(255,255,255,.08) 22%,transparent 23%),linear-gradient(180deg,#3b93ff,#2069d6);background-size:7px 7px,100% 100%;padding:calc(8px + env(safe-area-inset-top,0px)) 8px 10px;box-shadow:0 4px 10px rgba(0,0,0,.28)}
   #topStats{display:flex;gap:7px}
-  .stat{flex:1;display:flex;align-items:center;gap:5px;background:#12356e;border:2px solid #0d2a5c;border-radius:14px;padding:3px 4px 3px 3px;border-color:#0d2a5c}
-  .stat .si{width:30px;height:30px;border-radius:9px;background:var(--c,#fff);display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto;border:2px solid #ffffff40}
-  .stat b{color:#fff;font-size:15px;font-weight:900;flex:1;text-align:center}
-  .plus{width:26px;height:26px;border-radius:50%;background:linear-gradient(180deg,#4ee06a,#22b04d);color:#fff;font-size:17px;font-weight:900;line-height:1;flex:0 0 auto;box-shadow:0 2px 0 #189a3f;border:2px solid #fff}
+  .stat{flex:1;display:flex;align-items:center;gap:6px;background:#0e2e63;border:2px solid #0a2450;border-radius:15px;padding:5px 6px 5px 5px}
+  .stat .si{width:34px;height:34px;border-radius:10px;background:var(--c,#fff);display:flex;align-items:center;justify-content:center;font-size:19px;flex:0 0 auto;border:2px solid #ffffff55;box-shadow:inset 0 -2px 0 rgba(0,0,0,.15)}
+  .stat b{color:#fff;font-size:17px;font-weight:900;flex:1;text-align:center;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .plus{width:29px;height:29px;border-radius:50%;background:linear-gradient(180deg,#4ee06a,#22b04d);color:#fff;font-size:17px;font-weight:900;line-height:1;flex:0 0 auto;box-shadow:0 2px 0 #189a3f;border:2px solid #fff}
   #infoRow{display:flex;gap:7px;margin-top:7px}
   .infoL{flex:1;background:#12356e;border:2px solid #0d2a5c;border-radius:14px;padding:7px 10px;color:#fff}
   .iName b{font-size:16px}
@@ -110,6 +110,16 @@
   .introText{font-size:19px;font-weight:700;line-height:1.5;min-height:132px}.introDots{display:flex;gap:6px;justify-content:center;margin:18px 0}
   .introDots span{width:8px;height:8px;border-radius:50%;background:#ffffff40}.introDots span.on{background:#fff;transform:scale(1.2)}
   .introBtn{max-width:270px;margin:0 auto}.introSkip{margin-top:12px;font-size:12px;font-weight:700;color:#ffffff70;cursor:pointer}
+  #miniRow{display:flex;gap:7px;margin-top:7px}
+  .mchip{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;background:#0e2e63;border:2px solid #0a2450;border-radius:12px;padding:6px 0;color:#fff;font-size:15px;font-weight:900}
+  .mchip span{font-size:16px}.mchip b{font-size:15px}
+  .tile .ti{font-size:0!important}
+  .tileImg2{padding:5px 5px 2px}
+  #tiles .tile:nth-child(-n+4){background:linear-gradient(180deg,#4de077,#1fae52);box-shadow:0 5px 0 #148a3d}
+  #tiles .tile:nth-child(n+5){background:linear-gradient(180deg,#62b0ff,#2f83f0);box-shadow:0 5px 0 #1f63c8}
+  .tile{border:3px solid #ffffff;box-shadow-color:#000}
+  .qbtn{background:linear-gradient(180deg,#86e876,#4ac13e)}
+  .infoL,.iDate{background:#0e2e63;border-color:#0a2450}
 </style>
 </head>
 <body>
@@ -146,10 +156,10 @@
       </div>
       <div class="infoR">
         <div class="iDate" id="rDate">—</div>
-        <div class="miniStats"><div class="miniStat" id="rEnergy">⚡90</div><div class="miniStat" id="rSat">🍔80</div><div class="miniStat" id="rFat">🔥0</div></div>
         <button class="menuBtn" id="btnMenu">☰</button>
       </div>
     </div>
+    <div id="miniRow"><div class="mchip" id="rEnergy"><span>⚡</span><b>90</b></div><div class="mchip" id="rSat"><span>🍔</span><b>80</b></div><div class="mchip" id="rFat"><span>🔥</span><b>0</b></div></div>
   </div>
   <div id="stage">
     <img id="sceneBg" alt="">
