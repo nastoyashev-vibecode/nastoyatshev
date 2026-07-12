@@ -163,9 +163,18 @@
 <div id="avatarMood" style="display:none"></div>
 <script src="assets.js"></script>
 <script>
-/* Десктоп: telegram-web-app.js создаёт CloudStorage-заглушку, чьи методы бросают ошибку и обрывают игру.
-   Если getItem бросает синхронно (не настоящий Telegram) — отключаем CloudStorage, работаем на localStorage. */
-try{var _W=(window.Telegram&&window.Telegram.WebApp)||null;if(_W&&_W.CloudStorage){try{_W.CloudStorage.getItem("__probe__",function(){});}catch(e){_W.CloudStorage=null;}}}catch(e){}
+/* На десктопе (вне Telegram) telegram-web-app.js создаёт CloudStorage, чьи методы бросают ошибку
+   и обрывают игру при загрузке/сохранении. Свойство CloudStorage read-only, поэтому подменяем
+   его МЕТОДЫ на безопасные заглушки (падение на localStorage). В настоящем Telegram (initData
+   не пустой) не трогаем — облачное сохранение работает. */
+try{
+  var _W=(window.Telegram&&window.Telegram.WebApp)||null;
+  if(_W&&_W.CloudStorage&&(!_W.initData||!_W.initData.length)){
+    _W.CloudStorage.getItem=function(k,cb){if(cb)cb(null,null);};
+    _W.CloudStorage.setItem=function(k,v,cb){if(cb)cb(null,true);return true;};
+    _W.CloudStorage.removeItem=function(k,cb){if(cb)cb(null,true);};
+  }
+}catch(e){}
 </script>
 <script src="game.js"></script>
 </body>
