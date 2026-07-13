@@ -1197,3 +1197,335 @@ function tick(){try{var g=$('game');if(typeof S!=='undefined'&&S&&g&&!g.classLis
 setInterval(tick,500);setTimeout(tick,120);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(tick,150);});
 })();
+
+/* ================= ВОЛНА 1: профессии+, события+, дети-взросление, цель жизни, достижения+ ================= */
+(function(){
+try{
+/* --- новые карьерные треки --- */
+var NT={gov:"🏛️ Госсектор",med:"⚕️ Медицина",sci:"🔬 Наука",sport:"🏅 Спорт",show:"🎬 Шоу-биз",secu:"🚓 Силовые"};
+for(var k in NT){ if(!TRACKS[k]){TRACKS[k]=NT[k];TRACK_ORDER.push(k);} }
+/* --- новые профессии (18) --- */
+var NEWJOBS=[
+ {id:"clerk",t:"Госслужащий",track:"gov",req:{age:20,intellect:25,edu:1},base:2200,energy:22,skill:"intellect",gain:{intellect:1.4,charisma:0.4}},
+ {id:"inspector",t:"Инспектор",track:"gov",req:{age:23,intellect:35,charisma:20},base:3200,energy:24,skill:"intellect",gain:{intellect:1.2,charisma:0.6}},
+ {id:"gov_head",t:"Глава управы",track:"gov",req:{age:35,charisma:55,intellect:50,exp:{job:"inspector",n:40}},base:9000,energy:28,skill:"charisma",gain:{charisma:1,intellect:0.6}},
+ {id:"nurse",t:"Медбрат/медсестра",track:"med",req:{age:19,intellect:25,edu:1},base:2000,energy:30,skill:"intellect",gain:{intellect:1.4}},
+ {id:"paramedic",t:"Фельдшер скорой",track:"med",req:{age:21,intellect:40,strength:20},base:3000,energy:36,skill:"intellect",gain:{intellect:1.4,strength:0.4}},
+ {id:"doctor",t:"Врач",track:"med",req:{age:26,intellect:60,edu:2},base:6000,energy:30,skill:"intellect",gain:{intellect:1.4}},
+ {id:"surgeon",t:"Хирург",track:"med",req:{age:30,intellect:80,edu:3,exp:{job:"doctor",n:40}},base:12000,energy:34,skill:"intellect",gain:{intellect:1}},
+ {id:"labtech",t:"Лаборант",track:"sci",req:{age:19,intellect:35,edu:1},base:2100,energy:22,skill:"intellect",gain:{intellect:1.8}},
+ {id:"researcher",t:"Научный сотрудник",track:"sci",req:{age:24,intellect:60,edu:3},base:4200,energy:24,skill:"intellect",gain:{intellect:2}},
+ {id:"professor",t:"Профессор",track:"sci",req:{age:40,intellect:90,edu:4,exp:{job:"researcher",n:40}},base:9000,energy:26,skill:"intellect",gain:{intellect:1.2,charisma:0.6}},
+ {id:"coach",t:"Фитнес-тренер",track:"sport",req:{age:19,strength:35,charisma:20},base:2400,energy:34,skill:"strength",gain:{strength:2,charisma:0.5}},
+ {id:"athlete",t:"Спортсмен",track:"sport",req:{age:18,strength:55},base:4500,energy:44,skill:"strength",risky:true,gain:{strength:2}},
+ {id:"sport_star",t:"Звезда спорта",track:"sport",req:{age:24,strength:85,charisma:40,exp:{job:"athlete",n:40}},base:16000,energy:40,skill:"strength",risky:true,gain:{strength:1,charisma:1}},
+ {id:"host",t:"Ведущий",track:"show",req:{age:21,charisma:45,creativity:30},base:4000,energy:24,skill:"charisma",risky:true,gain:{charisma:2}},
+ {id:"actor",t:"Актёр",track:"show",req:{age:20,creativity:45,charisma:40},base:3800,energy:26,skill:"creativity",risky:true,gain:{creativity:1.8,charisma:1}},
+ {id:"celebrity",t:"Знаменитость",track:"show",req:{age:26,charisma:80,creativity:60,exp:{job:"actor",n:40}},base:20000,energy:30,skill:"charisma",risky:true,gain:{charisma:1,creativity:1}},
+ {id:"guard",t:"Охранник",track:"secu",req:{age:18,strength:25},base:1400,energy:34,skill:"strength",gain:{strength:1.4}},
+ {id:"cop",t:"Полицейский",track:"secu",req:{age:20,strength:35,intellect:20},base:2800,energy:34,skill:"strength",gain:{strength:1.2,intellect:0.6}},
+ {id:"detective",t:"Следователь",track:"secu",req:{age:26,intellect:55,charisma:30,exp:{job:"cop",n:40}},base:5500,energy:30,skill:"intellect",gain:{intellect:1.4,charisma:0.5}}
+];
+NEWJOBS.forEach(function(j){ if(!JOBS.find(function(x){return x.id===j.id;})) JOBS.push(j); });
+
+/* --- дети: взросление + события (синхронизируем с S.kids) --- */
+function syncKids(){ if(!S)return; if(!S.children)S.children=[]; while(S.children.length<(S.kids||0))S.children.push({bday:S.day}); while(S.children.length>(S.kids||0))S.children.pop(); }
+function childAges(){ syncKids(); return (S.children||[]).map(function(c){return Math.floor((S.day-c.bday)/365);}); }
+var _ad=agingDeath;
+agingDeath=function(){
+  try{ syncKids();
+    (S.children||[]).forEach(function(c){
+      var a=Math.floor((S.day-c.bday)/365);
+      if(!c.mark)c.mark={};
+      if(a>=7&&!c.mark.school){c.mark.school=1;log("👶 Ребёнок пошёл в школу.","good");}
+      if(a>=18&&!c.mark.grown){c.mark.grown=1;S.mood=clamp(S.mood+8);log("🎓 Ребёнок вырос и начал свой путь. Гордость.","ach");}
+    });
+  }catch(e){}
+  _ad();
+};
+
+/* --- цель жизни: бонус к итогу --- */
+var _ls=lifeScore;
+lifeScore=function(){
+  var b=_ls(); try{
+    if(S&&S.lifeGoal){ var g=0;
+      if(S.lifeGoal==="career"&&S.job&&jobById(S.job).base>=9000)g=6;
+      else if(S.lifeGoal==="family"&&S.married&&S.kids>=2)g=6;
+      else if(S.lifeGoal==="wealth"&&(S.peakMoney||0)>=5000000)g=6;
+      else if(S.lifeGoal==="creative"&&S.skills.creativity>=90)g=6;
+      else if(S.lifeGoal==="dynasty"&&(S.generation||1)>=2&&S.kids>=1)g=6;
+      b=Math.min(100,b+g);
+    }
+  }catch(e){} return b;
+};
+
+/* --- новые достижения --- */
+var NA=[{id:"phd2",n:"Профессор 🔬"},{id:"doc",n:"Врач ⚕️"},{id:"star",n:"Знаменитость 🌟"},{id:"cop",n:"На страже порядка 🚓"},{id:"goalmet",n:"Цель жизни достигнута 🎯"},{id:"bigfam",n:"Большая семья 👨‍👩‍👧‍👦"},{id:"traveler",n:"Повидал мир 🌍"},{id:"foundation",n:"Меценат 🏛️"}];
+NA.forEach(function(a){ if(!ACH.find(function(x){return x.id===a.id;})) ACH.push(a); });
+var _am=achMet;
+achMet=function(id){ try{ var s=S; switch(id){
+  case"phd2":return s.job==="professor";
+  case"doc":return s.job==="doctor"||s.job==="surgeon";
+  case"star":return s.job==="celebrity"||s.job==="sport_star";
+  case"cop":return s.job==="cop"||s.job==="detective";
+  case"goalmet":return !!s.lifeGoal&&_ls2(s);
+  case"bigfam":return s.kids>=3;
+  case"traveler":return !!s.flags.traveled;
+  case"foundation":return !!s.flags.foundation;
+}}catch(e){} return _am(id); };
+function _ls2(s){ if(s.lifeGoal==="career")return s.job&&jobById(s.job).base>=9000; if(s.lifeGoal==="family")return s.married&&s.kids>=2; if(s.lifeGoal==="wealth")return (s.peakMoney||0)>=5000000; if(s.lifeGoal==="creative")return s.skills.creativity>=90; if(s.lifeGoal==="dynasty")return (s.generation||1)>=2&&s.kids>=1; return false; }
+
+/* --- большой пул новых событий --- */
+var NE=[
+ /* цель жизни (ранний одноразовый выбор) */
+ {kind:"choice",w:6,tag:"neutral",when:function(s){return !s.lifeGoal&&s.day>=2;},t:"К чему ты хочешь прийти в жизни? (задаёт вектор и бонус к итогу)",
+  opts:[{l:"🏢 Карьера — стать большим боссом",run:function(s){s.lifeGoal="career";log("Цель жизни: карьера.","unlock");}},
+        {l:"👨‍👩‍👧 Семья — крепкий дом и дети",run:function(s){s.lifeGoal="family";log("Цель жизни: семья.","unlock");}},
+        {l:"💎 Богатство — финансовая свобода",run:function(s){s.lifeGoal="wealth";log("Цель жизни: богатство.","unlock");}}]},
+ {kind:"choice",w:3,tag:"neutral",when:function(s){return !s.lifeGoal&&s.day>=2;},t:"Или другой путь?",
+  opts:[{l:"🎨 Творчество — оставить след",run:function(s){s.lifeGoal="creative";log("Цель жизни: творчество.","unlock");}},
+        {l:"👑 Династия — род и наследие",run:function(s){s.lifeGoal="dynasty";log("Цель жизни: династия.","unlock");}}]},
+ /* рабочие ситуации */
+ {kind:"choice",w:2,tag:"neutral",when:function(s){return !!s.job;},t:"Горит дедлайн. Что делаешь?",
+  opts:[{l:"Впрячься (−настроение, +к грейду)",run:function(s){s.mood=clamp(s.mood-6);s.reviewPts=(s.reviewPts||0)+6;s.fatigue=Math.min(100,(s.fatigue||0)+12);log("Вытянул проект. Начальство заметило.","good");}},
+        {l:"Схалтурить (−репутация)",run:function(s){s.reputation=clamp(s.reputation-8);log("Сдал абы как. Осадочек.","bad");}}]},
+ {kind:"choice",w:1.6,tag:"neutral",when:function(s){return !!s.job;},t:"Конфликт с начальником — он не прав, но он начальник.",
+  opts:[{l:"Промолчать",run:function(s){s.mood=clamp(s.mood-5);log("Проглотил. Неприятно.","bad");}},
+        {l:"Отстоять своё (риск)",run:function(s){if(Math.random()<0.5){s.reputation=clamp(s.reputation+6);log("Тебя зауважали.","good");}else{s.reputation=clamp(s.reputation-10);s.mood=clamp(s.mood-6);log("Нажил врага наверху.","bad");}}}]},
+ {kind:"instant",w:1.5,tag:"good",when:function(s){return !!s.job;},run:function(s){var b=Math.round(jobPay(jobById(s.job))*0.7);s.money+=b;s.reviewPts=(s.reviewPts||0)+2;log("Похвалили за работу + премия: +"+b.toLocaleString('ru')+"₽","good");}},
+ /* моральные развилки */
+ {kind:"choice",w:1.4,tag:"neutral",run:function(s){return 0;},t:"На улице человеку стало плохо, вокруг проходят мимо.",
+  opts:[{l:"Помочь, вызвать скорую",run:function(s){s.reputation=clamp(s.reputation+5);s.mood=clamp(s.mood+6);if(s.flags.firstAid)log("Первая помощь пригодилась — спас человека!","good");else log("Помог человеку. Совесть чиста.","good");}},
+        {l:"Пройти мимо",run:function(s){s.mood=clamp(s.mood-6);log("Прошёл мимо. Потом было стыдно.","bad");}}]},
+ {kind:"choice",w:1.2,tag:"neutral",when:function(s){return s.money>=10000;},t:"Знакомый предлагает «серую» подработку — быстрые деньги, но нечисто.",
+  opts:[{l:"Согласиться",run:function(s){s.money+=price(30000);s.reputation=clamp(s.reputation-10);log("Взял грязные деньги.","bad");}},
+        {l:"Отказаться",run:function(s){s.reputation=clamp(s.reputation+3);log("Не стал мараться.","good");}}]},
+ /* родители */
+ {kind:"choice",w:1.5,tag:"neutral",when:function(s){return s.age>=35&&s.age<70;},t:"Родитель серьёзно заболел. Нужна дорогая операция.",
+  opts:[{l:"Оплатить лечение (−деньги)",run:function(s){s.money-=price(120000);s.mood=clamp(s.mood+6);s.reputation=clamp(s.reputation+4);log("Оплатил лечение родителю. Правильно.","good");}},
+        {l:"Не потянуть сейчас",run:function(s){s.mood=clamp(s.mood-18);log("Не смог помочь. Тяжело на душе.","bad");}}]},
+ {kind:"instant",w:0.8,tag:"good",when:function(s){return s.age>=48;},run:function(s){var g=price(200000)*(1+Math.random());g=Math.round(g);s.money+=g;s.mood=clamp(s.mood-6);log("Ушёл из жизни близкий родственник. Наследство: +"+g.toLocaleString('ru')+"₽.","bad");}},
+ {kind:"instant",w:1.2,tag:"good",run:function(s){s.mood=clamp(s.mood+8);log("Навестил родителей — стало теплее на душе.","good");}},
+ /* дети */
+ {kind:"choice",w:1.6,tag:"neutral",when:function(s){return s.kids>0;},t:"Ребёнок-подросток связался с плохой компанией.",
+  opts:[{l:"Поговорить по душам (время)",run:function(s){s.mood=clamp(s.mood-3);log("Достучался до ребёнка. Обошлось.","good");}},
+        {l:"Отмахнуться",run:function(s){s.mood=clamp(s.mood-10);log("Запустил ситуацию.","bad");}}]},
+ {kind:"instant",w:1,tag:"bad",when:function(s){return s.kids>0;},run:function(s){var r=price(6000);s.money-=r;s.mood=clamp(s.mood-3);log("Ребёнок заболел — врач и лекарства: −"+r.toLocaleString('ru')+"₽","bad");}},
+ {kind:"instant",w:0.8,tag:"good",when:function(s){return s.kids>0;},run:function(s){s.mood=clamp(s.mood+12);log("Ребёнок победил на олимпиаде! Гордость.","good");}},
+ {kind:"choice",w:1,tag:"neutral",when:function(s){return s.kids>0;},t:"Ребёнок поступает в вуз — платно или пусть сам на бюджет?",
+  opts:[{l:"Оплатить учёбу (−деньги, +будущее)",run:function(s){s.money-=price(200000);s.mood=clamp(s.mood+10);log("Оплатил детям образование.","good");}},
+        {l:"Пусть добивается сам",run:function(s){log("Ребёнок сам поступил на бюджет — уважение.","good");}}]},
+ /* сезон/праздники */
+ {kind:"instant",w:1.4,tag:"good",when:function(s){return season()==="winter";},run:function(s){var c=price(8000);s.money-=c;s.mood=clamp(s.mood+18);log("Новогодние праздники: подарки и стол −"+c.toLocaleString('ru')+"₽, зато 🙂+18.","good");}},
+ {kind:"instant",w:1.2,tag:"good",when:function(s){return season()==="summer";},run:function(s){s.mood=clamp(s.mood+10);s.health=clamp(s.health+4);log("Съездил на дачу/шашлыки — перезагрузка.","good");}},
+ {kind:"choice",w:1,tag:"neutral",when:function(s){return season()==="summer"&&s.money>=price(40000);},t:"Лето. Взять отпуск?",
+  opts:[{l:"Уехать отдыхать",run:function(s){s.money-=price(40000);s.mood=clamp(s.mood+30);s.health=clamp(s.health+8);s.flags.traveled=true;log("Отпуск: море и солнце. 🙂","good");}},
+        {l:"Остаться, копить",run:function(s){log("Отпуск в этом году пропустил.");}}]},
+ /* кризис среднего возраста / рефлексия */
+ {kind:"choice",w:1.3,tag:"neutral",when:function(s){return s.age>=40&&s.age<=52;},t:"Кризис среднего возраста. Всё ли так живёшь?",
+  opts:[{l:"Резкая перемена (−деньги, +настроение)",run:function(s){s.money-=price(50000);s.mood=clamp(s.mood+20);log("Сменил обстановку, купил «мечту». Полегчало.","good");}},
+        {l:"Смириться и работать дальше",run:function(s){s.mood=clamp(s.mood-8);log("Задавил в себе. Работаем дальше.","bad");}}]},
+ {kind:"instant",w:1,tag:"good",when:function(s){return s.age>=30;},run:function(s){s.mood=clamp(s.mood+8);s.friends=Math.min(100,s.friends+3);log("Встреча одноклассников — ностальгия и смех.","good");}},
+ /* друзья */
+ {kind:"instant",w:1.2,tag:"good",when:function(s){return s.friends>=30;},run:function(s){s.mood=clamp(s.mood+8);log("Друг позвал на юбилей — хорошо посидели.","good");}},
+ {kind:"choice",w:1,tag:"neutral",when:function(s){return s.friends>=25;},t:"Друг просит поручиться за его кредит.",
+  opts:[{l:"Поручиться (риск)",run:function(s){if(Math.random()<0.6){s.friends=Math.min(100,s.friends+10);log("Друг всё выплатил. Дружба крепче.","good");}else{s.money-=price(80000);log("Друг подвёл — повис его долг. −деньги, −дружба.","bad");s.friends=clamp(s.friends-20);}}},
+        {l:"Мягко отказать",run:function(s){s.friends=clamp(s.friends-5);log("Отказал — друг обиделся.","bad");}}]},
+ /* финансы/статус */
+ {kind:"instant",w:0.9,tag:"bad",when:function(s){return s.flags.ipReg||incMonSafe(s)>150000;},run:function(s){var f=price(20000);s.money-=f;log("Налоговая проверка — доначисление −"+f.toLocaleString('ru')+"₽.","bad");}},
+ {kind:"instant",w:1,tag:"good",when:function(s){return (s.stocks||0)>0;},run:function(s){var d=Math.round(s.stocks*0.1);s.stocks+=d;log("Портфель вырос: акции +"+d.toLocaleString('ru')+"₽.","good");}}
+];
+function incMonSafe(s){try{return s.job?jobById(s.job).base*20:0;}catch(e){return 0;}}
+NE.forEach(function(e){ EVENTS.push(e); });
+
+}catch(err){ if(typeof console!=="undefined")console.warn("WAVE1 err",err); }
+})();
+
+/* ================= ВОЛНА 2+3: завязка-ветки, соц-модель, паспорт жизни ================= */
+(function(){
+if(typeof document==="undefined")return;
+var PT=["заботлив","весёлый","амбициозный","спокойный","ревнивый","творческий","верный","упрямый"];
+var MET=["познакомились в кафе","встретились на работе","свёл общий друг","списались в сети","встретились в спортзале","столкнулись в метро"];
+var FN=["Дима","Лёша","Макс","Игорь","Паша","Рома","Катя","Оля","Настя","Юля","Вера","Соня"];
+
+/* --- ВОЛНА 2: ветвлёная завязка (заменяет старое интро) --- */
+var _sg=window.startGame;
+window.startGame=function(){ if(_sg)_sg(); var old=document.getElementById('introOv'); if(old)old.remove(); showIntro2(); };
+function showIntro2(){
+  if(!S)return;
+  var fam=(S.fate&&S.fate.family)||'mid', hl=(S.fate&&S.fate.health)||'normal', city=S.city, nm=S.name||'друг';
+  var common=[{e:"🎓",t:nm+", тебе 17. Позади последний школьный экзамен — детство кончилось."}];
+  var branch;
+  if(fam==='rich')branch=[
+    {e:"🏙️💳",t:"Отец — большая шишка, и ты живёшь на его деньги: тачка, клубы, всё лучшее."},
+    {e:"😠",t:"«Ты хоть рубль в жизни сам заработал?» — отец узнал, что за всё платил он."},
+    {e:"🧥❌",t:"Он отрезал тебя от денег. Осталась прописка у бабушки в "+city+" и пара сотен в кармане."},
+    {e:"🚪🧳",t:"«Год тебе. Приеду — покажешь, чего ты стоишь. Дальше — сам.»"}];
+  else if(fam==='poor')branch=[
+    {e:"🏚️",t:"Денег в семье всегда впритык. Старая квартира в "+city+", родные тянут всё на себе."},
+    {e:"🤝",t:"«Помочь особо нечем. Но ты крепкий — выкрутишься. Верю в тебя.»"},
+    {e:"🔥",t:"У тебя нет ни запасного плана, ни богатых родителей. Только ты и твои руки."}];
+  else branch=[
+    {e:"🏠",t:"Обычная семья, обычная квартира в "+city+". Ни бедно, ни богато."},
+    {e:"🎒",t:"«Поможем на первых порах, но на шею не сядешь. Пора взрослеть.»"}];
+  var hltxt=hl==='robust'?"Здоровья тебе не занимать — хоть отбавляй.":hl==='frail'?"Со здоровьем с детства непросто — врачи тебе знакомы.":"Здоровье обычное, как у всех.";
+  var slides=common.concat(branch,[{e:"⏳",t:hltxt+" "+city+", весна. Часы пошли — на что потратишь жизнь?"}]);
+  var i=0,ov=document.createElement('div');ov.id='introOv';ov.className='introOv';document.body.appendChild(ov);ov.style.display='flex';
+  function draw(){var sl=slides[i];ov.innerHTML='<div class="introCard"><div class="introEmoji">'+sl.e+'</div><div class="introText">'+sl.t+'</div><div class="introDots">'+slides.map(function(_,k){return '<span class="'+(k===i?'on':'')+'"></span>';}).join('')+'</div><button class="cta introBtn">'+(i<slides.length-1?'Далее ▶':'Начать ▶')+'</button>'+(i<slides.length-1?'<div class="introSkip">пропустить</div>':'')+'</div>';ov.querySelector('.introBtn').onclick=function(){if(i<slides.length-1){i++;draw();}else{ov.remove();try{render();}catch(e){}}};var sk=ov.querySelector('.introSkip');if(sk)sk.onclick=function(){ov.remove();try{render();}catch(e){}};}
+  draw();
+}
+
+/* --- соц-модель: характер партнёра + именованные друзья --- */
+function ensureSocial(){ if(!S)return;
+  if(S.partner&&!S.partner.trait){S.partner.trait=PT[Math.floor(Math.random()*PT.length)];S.partner.met=MET[Math.floor(Math.random()*MET.length)];S.partner.since=S.day;}
+  if(!S.friendList){S.friendList=[];var used={};for(var i=0;i<3;i++){var n;do{n=FN[Math.floor(Math.random()*FN.length)];}while(used[n]);used[n]=1;S.friendList.push({name:n,trait:PT[Math.floor(Math.random()*PT.length)]});}}
+}
+var _rSoc=render; render=function(){ try{ensureSocial();}catch(e){} _rSoc(); };
+/* пара событий с именами друзей */
+EVENTS.push({kind:"instant",w:1,tag:"good",when:function(s){return s.friendList&&s.friendList.length&&s.friends>=25;},run:function(s){var f=s.friendList[Math.floor(Math.random()*s.friendList.length)];s.mood=clamp(s.mood+8);s.friends=Math.min(100,s.friends+3);log(f.name+" ("+f.trait+") позвал(а) погулять — отлично провели время.","good");}});
+EVENTS.push({kind:"choice",w:1,tag:"neutral",when:function(s){return s.friendList&&s.friendList.length&&s.friends>=20;},t:"Друг просит серьёзной помощи в трудный момент.",
+  opts:[{l:"Помочь по-настоящему",run:function(s){s.money-=price(20000);s.friends=Math.min(100,s.friends+12);var f=s.friendList[0];log("Выручил "+f.name+" — теперь это друг на всю жизнь.","good");}},
+        {l:"Извиниться, не смочь",run:function(s){s.friends=clamp(s.friends-10);log("Не помог другу. Дистанция.","bad");}}]});
+
+/* --- ВОЛНА 3: «паспорт жизни» (богатый профиль по тапу на аватар) --- */
+function bar(label,val,max,color){var p=Math.max(0,Math.min(100,val/max*100));return '<div class="pbwrap"><div class="pblab">'+label+'<b>'+Math.round(val)+'</b></div><div class="pbbar"><i style="width:'+p+'%;background:'+color+'"></i></div></div>';}
+function radar(sk){
+  var keys=["intellect","charisma","strength","tech","creativity","craft"];var lab=["🧠","💬","💪","💻","🎨","🔧"];
+  var cx=110,cy=100,R=70;var pts=[],grid=[];
+  for(var i=0;i<6;i++){var ang=(-90+i*60)*Math.PI/180;var v=(sk[keys[i]]||0)/100;pts.push((cx+Math.cos(ang)*R*v).toFixed(1)+','+(cy+Math.sin(ang)*R*v).toFixed(1));grid.push((cx+Math.cos(ang)*R).toFixed(1)+','+(cy+Math.sin(ang)*R).toFixed(1));}
+  var labels='';for(var j=0;j<6;j++){var a=(-90+j*60)*Math.PI/180;labels+='<text x="'+(cx+Math.cos(a)*(R+14)).toFixed(1)+'" y="'+(cy+Math.sin(a)*(R+14)+4).toFixed(1)+'" font-size="14" text-anchor="middle">'+lab[j]+'</text>';labels+='<text x="'+(cx+Math.cos(a)*(R+14)).toFixed(1)+'" y="'+(cy+Math.sin(a)*(R+14)+16).toFixed(1)+'" font-size="9" fill="#6b8bab" text-anchor="middle">'+Math.round(sk[keys[j]]||0)+'</text>';}
+  return '<svg viewBox="0 0 220 210" width="100%" style="max-width:260px;display:block;margin:0 auto"><polygon points="'+grid.join(' ')+'" fill="#eef5fc" stroke="#cfe0ef" stroke-width="1.5"/><polygon points="'+pts.join(' ')+'" fill="rgba(43,140,255,.35)" stroke="#2b8cff" stroke-width="2"/>'+labels+'</svg>';
+}
+openHero=function(){
+  try{ensureSocial();}catch(e){}
+  openTileIdx=null;var $=function(id){return document.getElementById(id);};
+  $('sheetTitle').textContent="Паспорт жизни";
+  var jobT=S.job?jobById(S.job).t:'без работы';
+  var goalMap={career:"🏢 Карьера",family:"👨‍👩‍👧 Семья",wealth:"💎 Богатство",creative:"🎨 Творчество",dynasty:"👑 Династия"};
+  var fam='';
+  if(S.partner)fam+='<div class="pcard"><b>'+(S.married?'💍 Супруг(а)':'❤️ Партнёр')+': '+S.partner.name+'</b><div class="muted" style="font-size:11px">'+(S.partner.trait||'')+' · '+(S.partner.met||'')+'</div></div>';
+  if(S.kids>0){var ages=(S.children||[]).map(function(c){return Math.floor((S.day-c.bday)/365);});fam+='<div class="pcard"><b>👶 Дети: '+S.kids+'</b><div class="muted" style="font-size:11px">возраст: '+(ages.join(', ')||'—')+'</div></div>';}
+  (S.friendList||[]).forEach(function(f){fam+='<div class="pcard"><b>🤝 '+f.name+'</b><div class="muted" style="font-size:11px">друг · '+f.trait+'</div></div>';});
+  var nw=netWorth();
+  var fin='<div class="pgrid">'
+    +'<div class="fcell"><span>💵 Кэш</span><b>'+S.money.toLocaleString('ru')+'</b></div>'
+    +'<div class="fcell"><span>💎 Капитал</span><b>'+nw.toLocaleString('ru')+'</b></div>'
+    +'<div class="fcell"><span>🏦 Вклад</span><b>'+(S.deposit||0).toLocaleString('ru')+'</b></div>'
+    +'<div class="fcell"><span>📈 Акции</span><b>'+(S.stocks||0).toLocaleString('ru')+'</b></div>'
+    +'<div class="fcell"><span>🪙 Крипта</span><b>'+(S.crypto||0).toLocaleString('ru')+'</b></div>'
+    +'<div class="fcell"><span>🏢 Аренда</span><b>'+(S.rentalUnits||0)+'</b></div></div>';
+  var health='<div class="hbars">'+bar("❤️ Здоровье",S.health,100,"#f0426b")+bar("🙂 Настроение",S.mood,100,"#f0b000")+bar("⚡ Энергия",S.energy,100,"#f5a300")+bar("🍔 Сытость",S.sat,100,"#fb6f3c")+bar("🔥 Усталость",S.fatigue||0,100,"#ff5a5f")+'</div>';
+  if((S.addiction&&(S.addiction.smoke||S.addiction.alcohol))||(S.chronic&&S.chronic.length))health+='<div class="muted" style="font-size:11px;margin-top:4px">⚠️ '+([S.addiction&&S.addiction.smoke?'курение':'',S.addiction&&S.addiction.alcohol?'алкоголь':''].concat((S.chronic||[]).map(function(){return 'хроническое';})).filter(Boolean).join(', '))+'</div>';
+  var achv=ACH.map(function(a){return '<span class="skchip" style="opacity:'+(S.ach[a.id]?1:.4)+'">'+(S.ach[a.id]?'🏆':'🔒')+' '+a.n+'</span>';}).join('');
+  $('sheetBody').innerHTML=''
+    +'<div class="hcard"><div class="hrow"><b>'+(S.name||'Игрок')+'</b><span>'+S.age+' лет · '+rank()+'</span></div>'
+    +'<div class="hrow"><span>💼 '+jobT+(S.job?(' '+(["","(II)","(III)","(IV)"][S.grade||0]||"")):'')+'</span><span>🎓 '+EDU[S.edu].t+'</span></div>'
+    +'<div class="hrow"><span>🏠 '+HOUSING[S.housing].t+'</span><span>🚗 '+TRANSPORT[S.transport].t+'</span></div>'
+    +(S.lifeGoal?'<div class="hrow"><span>🎯 Цель: '+(goalMap[S.lifeGoal]||S.lifeGoal)+'</span><span>⭐ Репутация '+Math.round(S.reputation)+'</span></div>':'')+'</div>'
+    +'<div class="hsec"><div class="hsecT">Навыки</div>'+radar(S.skills)+'</div>'
+    +'<div class="hsec"><div class="hsecT">Самочувствие</div>'+health+'</div>'
+    +'<div class="hsec"><div class="hsecT">Финансы</div>'+fin+'</div>'
+    +'<div class="hsec"><div class="hsecT">Семья и друзья</div>'+(fam||'<div class="muted">Пока один. Загляни в «Личное».</div>')+'</div>'
+    +'<div class="hsec"><div class="hsecT">Достижения '+Object.keys(S.ach).length+'/'+ACH.length+'</div>'+achv+'</div>'
+    +'<button class="btnBig" style="background:linear-gradient(180deg,#5aa0ff,#3b7fe0);margin-bottom:10px" onclick="openLog()">📜 Лог событий</button>'
+    +'<button class="btnBig" style="background:linear-gradient(180deg,#ff6b6b,#e04848)" onclick="resetGame()">↺ Начать жизнь заново</button>';
+  $('modal').classList.remove('hidden');
+};
+})();
+
+/* фикс привязки к window (бутстрап ранее явно выставил старые ссылки) */
+if(typeof window!=="undefined"){try{window.openHero=openHero;}catch(e){}}
+
+/* ================= ВОЛНА 4a: ПРЕМИУМ-КАРТОЧКИ действий (иллюстрация + глянец + анимации) ================= */
+(function(){
+if(typeof document==="undefined")return;
+function IMG(rel){return (typeof IMGSRC==="function")?IMGSRC(rel):("assets/"+rel);}
+function emojiOf(t){var m=(t||"").match(/[←-⇿⌀-➿⬀-⯿︀-️\u{1F000}-\u{1FAFF}]/u);return m?m[0]:"✦";}
+/* переопределяем card(): вакансии — как были (jart), обычные действия — премиум-плитка с картинкой */
+card=function(a){
+  MODAL_ACTS.push(a);var i=MODAL_ACTS.length-1,ok=a.ok(),dis=ok!==true;
+  if(a.id.indexOf('hire_')===0){
+    var jid=a.id.slice(5),j=jobById(jid),cur=(S.job===jid);
+    var btn=cur?'<span class="jok">✓</span>':(dis?'<span class="jlock">🔒</span>':'<span class="jtake">ПРИНЯТЬ</span>');
+    return '<button class="acard jcard'+((dis&&!cur)?' locked':'')+'" data-i="'+i+'"'+(dis?' disabled':'')+'>'
+      +'<div class="jart"><img src="'+IMG('jobs/'+jid+'.png')+'" alt="" onerror="this.remove()"><span class="jartfb">'+TRACKS[j.track].split(' ')[0]+'</span></div>'
+      +'<div class="jinfo"><div class="jt">'+j.t+'</div><div class="jpay"><b>'+j.base.toLocaleString('ru')+'</b> ₽/см</div><div class="jcond">'+a.sub()+'</div></div>'
+      +'<div class="jbtnwrap">'+btn+'</div></button>';
+  }
+  var em=emojiOf(a.title());
+  return '<button class="acard pxcard'+(dis?' pxdis':'')+'" data-i="'+i+'"'+(dis?' disabled':'')+' style="--d:'+i+'">'
+    +'<div class="pxthumb"><img src="'+IMG('actions/'+a.id+'.png')+'" alt="" onerror="this.style.display=\'none\'"><span class="pxfb">'+em+'</span></div>'
+    +'<div class="pxbody"><div class="pxT">'+a.title()+'</div><div class="pxC">'+a.sub()+'</div></div>'
+    +'<div class="pxgo">'+(dis?'🔒':'▸')+'</div></button>';
+};
+/* искры при клике на доступную карточку (богатые анимации) */
+document.addEventListener('click',function(e){
+  var c=e.target&&e.target.closest&&e.target.closest('.pxcard, .jcard');
+  if(!c||c.disabled)return;
+  try{ sparkle(e.clientX||0,e.clientY||0); }catch(err){}
+},true);
+function sparkle(x,y){
+  var box=document.createElement('div');box.className='sparkleBox';box.style.left=x+'px';box.style.top=y+'px';
+  for(var i=0;i<8;i++){var p=document.createElement('i');var ang=(i/8)*6.283,dist=18+Math.random()*16;p.style.setProperty('--dx',(Math.cos(ang)*dist).toFixed(1)+'px');p.style.setProperty('--dy',(Math.sin(ang)*dist).toFixed(1)+'px');p.style.background=['#f6a609','#12b76a','#2b8cff','#ee46bc'][i%4];box.appendChild(p);}
+  document.body.appendChild(box);setTimeout(function(){box.remove();},650);
+}
+})();
+
+/* ================= БАЛАНС-ФИКСЫ v5 (по аудиту: инфляция, смертность, эксплойты, навыки, банкротство) ================= */
+(function(){
+try{
+  CFG.inflMonthly=0.0015;                 // C1: базовая инфляция ниже
+  wageInfl=function(){return 1;};         // C1: зарплаты растут вместе с ценами
+  var PRICE_CAP=6;                         // C1: цены за жизнь не выше ×6
+  // C4: навыки медленнее + убывающая отдача
+  addSkill=function(obj,mult){
+    var gen=S.trait==="genius"?1.35:1;
+    for(var k in obj){ var cur=S.skills[k]||0;
+      var dim=Math.pow(Math.max(0,1-cur/100),1.35);
+      var g=obj[k]*(mult==null?1:mult)*0.5*dim*((k==="intellect"||k==="creativity")?gen:1);
+      S.skills[k]=Math.min(100,cur+g);
+    }
+  };
+  // C3: командировка/отпуск больше не кнопки бабло
+  var _ca=careerActions;
+  careerActions=function(){
+    var acts=_ca();
+    acts.forEach(function(x){
+      if(x.id==="btrip"){
+        x.show=function(){return true;};
+        x.ok=function(){var j=jobById(S.job);if(S.flags.btripCd&&S.day<S.flags.btripCd)return "недавно был в командировке";return S.energy<j.energy*2?"мало энергии":true;};
+        x.sub=function(){var j=jobById(S.job);return "2 дня · −"+(j.energy*2)+"⚡ · "+money(Math.round(jobPay(j)*2))+" · 🙂−6 · раз в 2 нед";};
+        x.run=function(){var j=jobById(S.job);var pay=Math.round(jobPay(j)*2);newDay(true);newDay(true);S.energy=clamp(S.energy-j.energy*2);S.money+=pay;S.exp[j.id]=(S.exp[j.id]||0)+2;S.mood=clamp(S.mood-6);if(S.partner)S.attention=clamp((S.attention||60)-10);S.flags.btripCd=S.day+14;log("Командировка: "+money(pay),"good");};
+      }
+      if(x.id==="vacation"){
+        x.ok=function(){if(S.flags.vacYear!=null&&Math.floor(S.day/365)<=S.flags.vacYear)return "отпуск уже был в этом году";return true;};
+        x.sub=function(){return "7 дней · 🙂+35 ❤️+15 · ЗП идёт · раз в год";};
+        x.run=function(){var j=jobById(S.job);var pay=Math.round(jobPay(j));for(var i=0;i<7;i++)newDay(true);S.money+=pay;S.mood=clamp(S.mood+35);S.health=clamp(S.health+15);S.flags.vacYear=Math.floor(S.day/365);log("Отпуск: отдохнул, ЗП сохранилась ("+money(pay)+").","good");};
+      }
+    });
+    return acts;
+  };
+  // C2: автопилот не убивает + клемп цен
+  var _auto=autoDay;
+  autoDay=function(){
+    var pay=_auto();
+    if(S&&!S.dead){
+      if(S.age<62 && S.health<48){ var need=48-S.health; S.health=clamp(S.health+Math.min(5,need)); if(S.money>price(600))S.money-=price(250); }
+      if(S.priceMul>PRICE_CAP)S.priceMul=PRICE_CAP;
+    }
+    return pay;
+  };
+  var _ad=agingDeath;
+  agingDeath=function(){ if(S&&S.priceMul>PRICE_CAP)S.priceMul=PRICE_CAP; _ad(); };
+  // C6: мягкое банкротство — сперва распродажа активов
+  var _fc=financeCheck;
+  financeCheck=function(){
+    if(!S||S.money>=0)return;
+    if(S.money<0&&(S.deposit||0)>0){var n=Math.min(S.deposit,-S.money);S.deposit-=n;S.money+=n;}
+    if(S.money<0&&(S.stocks||0)>0){var n2=Math.min(S.stocks,-S.money);S.stocks-=n2;S.money+=n2;}
+    if(S.money<0&&(S.crypto||0)>0){var n3=Math.min(S.crypto,-S.money);S.crypto-=n3;S.money+=n3;}
+    if(S.money<0&&(S.rentalUnits||0)>0){S.rentalUnits--;S.money+=priceRaw(2400000);log("Продал инвест-квартиру ради закрытия долгов.","bad");}
+    _fc();
+  };
+}catch(e){if(typeof console!=="undefined")console.warn("FIX v5 err",e);}
+})();
